@@ -1,0 +1,27 @@
+# frozen_string_literal: true
+
+default_platform(:android)
+
+platform :android do
+  desc "Run unit tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Build and upload to Play Store internal track"
+  lane :beta do
+    increment_version_code(gradle_file_path: "app/build.gradle.kts")
+    gradle(task: "bundle", build_type: "Release",
+           properties: { "android.injected.signing.store.file" => ENV["KEYSTORE_PATH"],
+                         "android.injected.signing.store.password" => ENV["KEYSTORE_PASSWORD"],
+                         "android.injected.signing.key.alias" => ENV["KEY_ALIAS"],
+                         "android.injected.signing.key.password" => ENV["KEY_PASSWORD"] })
+    upload_to_play_store(track: "internal", aab: "app/build/outputs/bundle/release/app-release.aab")
+    slack(message: "New ShopWave Android beta on Play internal track ✓")
+  end
+
+  desc "Promote internal → production"
+  lane :release do
+    upload_to_play_store(track: "internal", track_promote_to: "production")
+  end
+end
